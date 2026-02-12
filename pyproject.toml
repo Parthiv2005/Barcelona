@@ -1,0 +1,27 @@
+[project]
+name = "eagle"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "albumentations>=2.0.8",
+    "boxmot>=15.0.2",
+    "ipykernel>=6.30.1",
+    "mplsoccer>=1.5.1",
+    "ultralytics>=8.3.184",
+    "torch==2.6.0",
+    "torchvision==0.21.0",
+]
+
+[tool.uv]
+required-environments = ["sys_platform == 'win32' and platform_machine == 'AMD64'"]
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+torchvision = { index = "pytorch-cu124" }
