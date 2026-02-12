@@ -1,4 +1,4 @@
-# Byte-compiled / optimized / DLL files
+﻿# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
@@ -166,5 +166,6 @@ cython_debug/
 *.pth
 *.mp4
 weights/
-examples/output/output/
+examples/output/
 eagle/models/weights.zip
+output/
