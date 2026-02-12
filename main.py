@@ -9,12 +9,20 @@ from argparse import ArgumentParser
 import pandas as pd
 import cv2
 import numpy as np
+from collections import defaultdict
 
 
 def main():
     parser = ArgumentParser()
     parser.add_argument("--video_path", type=str, required=True)
     parser.add_argument("--fps", type=int, default=24)
+    parser.add_argument("--disable_summary_stats", action="store_true", help="Skip writing summary_stats.json")
+    parser.add_argument(
+        "--max_step_meters",
+        type=float,
+        default=3.0,
+        help="Ignore per-frame player movement jumps larger than this (meters) when computing stats.",
+    )
     args = parser.parse_args()
 
     os.makedirs("output", exist_ok=True)
@@ -39,6 +47,10 @@ def main():
 
     processed_df = processor.format_data(df)
     processed_df.to_json(f"{root}/processed_data.json", orient="records")
+    if not args.disable_summary_stats:
+        summary_stats = build_summary_stats(df, fps, team_mapping, args.max_step_meters)
+        with open(f"{root}/summary_stats.json", "w") as f:
+            json.dump(summary_stats, f, default=float, indent=2)
 
     out = []
     cols = [x for x in df.columns if "video" in x and x not in ["Bottom_Left", "Top_Left", "Top_Right", "Bottom_Right"]]
@@ -80,6 +92,72 @@ def main():
 
     write_video(out, f"{root}/annotated.mp4", fps)
     print("Data saved to", root)
+
+
+def _is_valid_point(value):
+    if isinstance(value, (list, tuple)) and len(value) == 2:
+        return pd.notna(value[0]) and pd.notna(value[1])
+    return False
+
+
+def _calculate_track_stats(points, fps, max_step_meters):
+    total_distance = 0.0
+    valid_samples = 0
+    segments_used = 0
+
+    prev = None
+    for point in points:
+        if not _is_valid_point(point):
+            prev = None
+            continue
+        curr = (float(point[0]), float(point[1]))
+        valid_samples += 1
+        if prev is not None:
+            step_distance = float(np.hypot(curr[0] - prev[0], curr[1] - prev[1]))
+            if step_distance <= max_step_meters:
+                total_distance += step_distance
+                segments_used += 1
+        prev = curr
+
+    duration_sec = segments_used / fps if fps > 0 else 0.0
+    avg_speed_mps = total_distance / duration_sec if duration_sec > 0 else 0.0
+
+    return {
+        "distance_m": round(total_distance, 3),
+        "duration_s": round(duration_sec, 3),
+        "avg_speed_mps": round(avg_speed_mps, 3),
+        "samples": valid_samples,
+    }
+
+
+def build_summary_stats(df, fps, team_mapping, max_step_meters):
+    summary = {
+        "fps": fps,
+        "frames_with_people": int(len(df)),
+        "max_step_meters": float(max_step_meters),
+        "players": {},
+        "totals_by_team": {},
+        "ball": {},
+    }
+
+    totals_by_team = defaultdict(float)
+    player_cols = [col for col in df.columns if col.startswith(("Player_", "Goalkeeper_")) and not col.endswith("_video")]
+
+    for col in sorted(player_cols):
+        role, id_text = col.split("_", 1)
+        player_id = int(id_text)
+        stats = _calculate_track_stats(df[col].tolist(), fps, max_step_meters)
+        team = team_mapping.get(player_id, "unknown")
+        stats["role"] = role
+        stats["team"] = team
+        summary["players"][str(player_id)] = stats
+        if team != "unknown":
+            totals_by_team[str(team)] += stats["distance_m"]
+
+    summary["totals_by_team"] = {team: round(distance, 3) for team, distance in sorted(totals_by_team.items())}
+    summary["ball"] = _calculate_track_stats(df["Ball"].tolist(), fps, max_step_meters=1e9)
+
+    return summary
 
 
 if __name__ == "__main__":

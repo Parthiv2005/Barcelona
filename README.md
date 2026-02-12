@@ -7,6 +7,7 @@ Football broadcast-to-tracking pipeline for extracting player and ball coordinat
 - Tracks objects across frames.
 - Projects coordinates onto a standard 105x68 pitch.
 - Produces annotated video and structured outputs for analysis.
+- Exports `summary_stats.json` with per-player distance, average speed, team totals, and ball travel distance.
 
 ## Quick start
 1. Install `uv`.
@@ -19,6 +20,16 @@ Football broadcast-to-tracking pipeline for extracting player and ball coordinat
    uv run main.py --video_path input_video.mp4
    ```
 4. Check output under `output/<video_name>/`.
+
+## Extra options
+- Tune movement filtering for stats:
+  ```bash
+  uv run main.py --video_path input_video.mp4 --max_step_meters 2.5
+  ```
+- Skip stats export:
+  ```bash
+  uv run main.py --video_path input_video.mp4 --disable_summary_stats
+  ```
 
 ## Useful paths
 - Code: `eagle/`
